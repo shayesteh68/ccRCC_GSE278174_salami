@@ -1,0 +1,43 @@
+sample_id	gsm_id	title	tissue	condition	in_counts
+SI_16472	GSM8541088	MyriadR 1161	Clear Cell RCC	Primary	True
+SI_17039	GSM8541089	MyriadR 180	Clear Cell RCC	Primary	True
+SI_17041	GSM8541090	MyriadR 850	Clear Cell RCC	Primary	True
+SI_17056	GSM8541091	MyriadR 790	Clear Cell RCC	Primary	True
+SI_17058	GSM8541092	MyriadR 2068	Clear Cell RCC	Primary	True
+SI_17060	GSM8541093	MyriadR 1799	Clear Cell RCC	Primary	True
+SI_17065	GSM8541094	MyriadR 1860	Clear Cell RCC	Primary	True
+SI_17233	GSM8541095	MyriadR 96	Clear Cell RCC	Primary	True
+SI_17234	GSM8541096	MyriadR 902	Clear Cell RCC	Primary	True
+SI_17235	GSM8541097	MyriadR 1267	Clear Cell RCC	Primary	True
+SI_17239	GSM8541098	MyriadR 182	Clear Cell RCC	Primary	True
+SI_17246	GSM8541099	MyriadR 819	Clear Cell RCC	Primary	True
+SI_17249	GSM8541100	MyriadR 1234	Clear Cell RCC	Primary	True
+SI_17397	GSM8541101	MyriadR 866	Clear Cell RCC	Primary	True
+SI_17403	GSM8541102	MyriadR 969	Clear Cell RCC	Primary	True
+SI_17410	GSM8541103	MyriadR 2159	Clear Cell RCC	Primary	True
+SI_17855	GSM8541104	MyriadR 260	Clear Cell RCC	Primary	True
+SI_17870	GSM8541105	MyriadR 837	Clear Cell RCC	Primary	True
+SI_17876	GSM8541106	MyriadR 1484	Clear Cell RCC	Primary	True
+SI_21411	GSM8541107	GU-10-34897	Adrenal	Metastatic	True
+SI_21412	GSM8541108	GA-11-00765	Lymph	Metastatic	True
+SI_21413	GSM8541109	NF-04-40107	Bone	Metastatic	True
+SI_21414	GSM8541110	GU-06-46615	Adrenal	Metastatic	True
+SI_21415	GSM8541111	IF-03-19418	Adrenal	Metastatic	True
+SI_21417	GSM8541112	IF-13-23516	Lung	Metastatic	True
+SI_21418	GSM8541113	IF-08-24385	Lung	Metastatic	True
+SI_21419	GSM8541114	GA-06-02407	Liver	Metastatic	True
+SI_21424	GSM8541115	GA-10-58544	Liver	Metastatic	True
+SI_21425	GSM8541116	IS-05-37079	Lung	Metastatic	True
+SI_21426	GSM8541117	IS-02-21878	Lymph	Metastatic	True
+SI_21429	GSM8541118	IS-11-63453	Lung	Metastatic	True
+SI_22536	GSM8541119	IF-03-21898	Bone	Metastatic	True
+SI_22537	GSM8541120	IS-03-21959	Bone	Metastatic	True
+SI_22540	GSM8541121	GU-06-35275	Soft tissue	Metastatic	True
+SI_22541	GSM8541122	IF-10-08610	Lung	Metastatic	True
+SI_22542	GSM8541123	IF-05-38205	Soft tissue	Metastatic	True
+SI_22545	GSM8541124	IS-03-26079	Bone	Metastatic	True
+SI_22546	GSM8541125	IS-09-22020A	Soft tissue	Metastatic	True
+SI_22547	GSM8541126	IS-05-51846	Lung	Metastatic	True
+SI_24143	GSM8541127	IF-05-40491	Bone	Metastatic	True
+SI_24145	GSM8541128	SU-15-8688	Adrenal	Metastatic	True
+SI_24146	GSM8541129	IS-06-09254	Bone	Metastatic	True
