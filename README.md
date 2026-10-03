@@ -1,77 +1,119 @@
-# Clear Cell Renal Cell Carcinoma (ccRCC) Progression & Metastasis Analysis
+# End-to-End Single-Cell RNA-Seq Analysis Pipeline (Seurat v5)
+**Profiling 3k Peripheral Blood Mononuclear Cells (PBMCs) with Unsupervised Clustering and Cell Type Annotation**
 
-An end-to-end biostatistical and transcriptomic profiling pipeline analyzing differential gene expression and functional pathway activation in primary versus metastatic clear cell renal cell carcinoma (ccRCC), based on the clinical cohort from **Dr. Simpa S. Salami** (University of Michigan Rogel Cancer Center; NCBI GEO: [GSE278174](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE278174)).
-
----
-
-## 🔬 Dataset & Clinical Cohort Summary
-
-| Metric / Parameter | Value |
-| :--- | :--- |
-| **GEO Accession** | [GSE278174](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE278174) |
-| **Total Patient Samples** | **42** biologically independent ccRCC tissues |
-| **Experimental Design** | **19 Primary ccRCC** vs **23 Metastatic ccRCC** |
-| **Quantification Platform** | RNA-Seq Raw Counts (14,971 genes profiled) |
-| **Target Investigator** | Dr. Simpa S. Salami, MD, MPH (U-M Rogel Cancer Center) |
+![R](https://img.shields.io/badge/R-4.3+-blue.svg)
+![Seurat](https://img.shields.io/badge/Seurat-v5-green.svg)
+![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
 ---
 
-## 📊 Analytical Highlights & Key Findings
-
-- **Statistical Modeling:** Variance-stabilizing transformation (VST) and negative binomial Generalized Linear Model (GLM) via DESeq2.
-- **Transcriptomic Dysregulation:** Identified **1,713 Up-regulated** and **1,747 Down-regulated** genes in metastatic lesions compared to primary tumors ($|\log_2\text{FC}| \ge 1$, $\text{FDR} < 0.05$).
-- **Hallmark Pathway Enrichment:** Significant activation of **Epithelial-Mesenchymal Transition (EMT)** ($p = 0.0087$, 8 key driver genes) and **Interferon Gamma Response** ($p = 0.0381$), delineating the invasive phenotypic switch driving ccRCC metastasis.
+## Overview
+This repository contains a reproducible, end-to-end single-cell RNA-sequencing (scRNA-seq) workflow implemented in **R** using **Seurat v5**. The pipeline processes the standard 10x Genomics **PBMC 3k** dataset (Peripheral Blood Mononuclear Cells from a healthy donor), performing quality control, normalization, feature selection, dimensionality reduction, unsupervised graph-based clustering, differential expression analysis, and biological cell type annotation.
 
 ---
 
-## 📈 Publication Figures
+## Biological Insights & Results
 
-| Sample Segregation (PCA) | Global Transcriptomic Shift (Volcano) | Hallmark Enrichment |
-| :---: | :---: | :---: |
-| ![PCA](results/plots/pca_plot_primary_vs_metastatic.png) | ![Volcano](results/plots/volcano_plot.png) | ![Hallmark Pathways](results/plots/hallmark_pathways_up.png) |
+The analysis identified **9 distinct immune cell populations** based on well-established canonical markers:
+
+| Cluster | Identified Cell Type | Canonical / Top Markers | Cell Count | Percentage (%) |
+| :---: | :--- | :--- | :---: | :---: |
+| **0** | Naive CD4+ T cells | `CCR7`, `LEF1`, `MAL`, `PIK3IP1` | 684 | 25.9% |
+| **1** | CD14+ Monocytes | `CD14`, `S100A8`, `S100A9`, `FOLR3` | 481 | 18.2% |
+| **2** | Memory CD4+ T cells | `AQP3`, `CD40LG`, `CD2`, `TRAT1` | 476 | 18.0% |
+| **3** | B cells | `CD79A`, `VPREB3`, `TCL1A`, `LINC00926` | 344 | 13.0% |
+| **4** | CD8+ T cells | `CD8A`, `GZMK`, `GZMH`, `CCL5` | 291 | 11.0% |
+| **5** | FCGR3A+ (CD16+) Monocytes | `CKB`, `CDKN1C`, `MS4A4A`, `HES4` | 162 | 6.1% |
+| **6** | Natural Killer (NK) cells | `GNLY`, `GZMB`, `SPON2`, `AKR1C3` | 155 | 5.9% |
+| **7** | Dendritic Cells (DCs) | `FCER1A`, `CLEC10A`, `SERPINF1` | 32 | 1.2% |
+| **8** | Platelets | `PPBP`, `ITGA2B (CD41)`, `GP9`, `PF4` | 13 | 0.5% |
+
+<p align="center">
+  <img src="figures/08_umap_annotated_celltypes.png" width="65%" alt="UMAP Cell Annotation">
+  <img src="figures/09_cell_type_proportions.png" width="65%" alt="Cell Type Proportions">
+</p>
 
 ---
 
-## 📁 Project Structure
+## Pipeline Workflow
+
+1. **Quality Control & Filtering (`01_qc_filter.R`)**:
+   - Filtered low-quality cells and potential doublets/empty droplets:
+     - `nFeature_RNA`: 200 to 2,500 genes
+     - Mitochondrial read percentage: < 5%
+   - Retained **2,638 high-quality cells** out of 2,700 raw cells.
+
+2. **Normalization & Feature Selection (`02_normalize_pca.R`)**:
+   - Applied global scaling normalization (`LogNormalize`, scale factor = 10,000).
+   - Identified **top 2,000 highly variable genes (HVGs)** using variance-stabilizing transformation (`vst`).
+   - Scaled data and performed linear dimensionality reduction via **PCA**.
+
+3. **Graph-based Clustering & UMAP (`03_clustering_umap.R`)**:
+   - Constructed Shared Nearest Neighbor (SNN) graph using top 10 principal components.
+   - Clustered cells using the Louvain algorithm (`resolution = 0.5`).
+   - Projected cells onto 2D space using **UMAP**.
+
+4. **Biomarker Identification (`04_find_markers.R`)**:
+   - Wilcoxon Rank Sum test with Bonferroni correction (`FindAllMarkers`).
+   - Extracted positive cluster markers (`log2FC >= 0.25`, `min.pct = 0.25`).
+   - Generated marker expression Heatmaps and DotPlots.
+
+5. **Cell Type Annotation (`05_cell_annotation.R`)**:
+   - Curated and assigned immunological identities based on known markers.
+   - Generated final publication-ready figures.
+
+---
+
+## Repository Structure
+
 ```text
-ccRCC_GSE278174_salami/
 ├── data/
-│   ├── metadata/
-│   │   └── coldata.tsv                           # Curated sample design matrix (42 samples)
-│   └── rawcounts/
-│       └── GSE278174_rawcounts.tsv               # Raw expression counts (14,971 genes)
+│   └── filtered_gene_bc_matrices/hg19/
+├── figures/
 ├── results/
-│   ├── deseq2/
-│   │   ├── differential_expression_Metastatic_vs_Primary.csv # Full DEG statistics
-│   │   └── pathway_hallmark_metastatic_up.csv    # Functional pathway enrichment rankings
-│   └── plots/
-│       ├── pca_plot_primary_vs_metastatic.png   # 300 DPI PCA ordination
-│       ├── volcano_plot.png                      # 300 DPI annotated Volcano plot
-│       └── hallmark_pathways_up.png              # 300 DPI Hallmark enrichment barplot
+│   ├── qc/
+│   ├── clustering/
+│   ├── markers/
+│   └── final_annotated_pbmc.rds
 ├── scripts/
-│   ├── 00_fetch_geo_metadata.R                   # Metadata parsing and integrity verification
-│   ├── 01_deseq2_analysis.R                      # Normalization, statistical testing, plotting
-│   └── 02_pathway_enrichment.R                   # Standalone MSigDB Hallmark Fisher exact test
+│   ├── 01_qc_filter.R
+│   ├── 02_normalize_pca.R
+│   ├── 03_clustering_umap.R
+│   ├── 04_find_markers.R
+│   └── 05_cell_annotation.R
+├── environment.yml
 ├── .gitignore
 └── README.md
-⚙️ Environment Setup & Reproducibility
-bash
-# Clone the repository
-git clone https://github.com/shayesteh68/ccRCC_GSE278174_salami.git
-cd ccRCC_GSE278174_salami
+```
 
-# Activate the dedicated biostatistical environment
-conda activate r_deseq_env
+---
 
-# Step 1: Run DESeq2 differential expression modeling & QC plots
-Rscript scripts/01_deseq2_analysis.R
+## Installation & Usage
 
-# Step 2: Run Hallmark pathway enrichment analysis
-Rscript scripts/02_pathway_enrichment.R
-👤 Author & Contact
-Narges Shayesteh
+### 1. Clone the repository
+```bash
+git clone https://github.com/shayesteh68/scrnaseq-seurat-pbmc3k.git
+cd scrnaseq-seurat-pbmc3k
+```
 
-Bioinformatician & RNA-Seq Data Specialist
+### 2. Set up environment
+```bash
+conda env create -f environment.yml
+conda activate r_seurat_env
+```
 
-LinkedIn: linkedin.com/in/narges-shayesteh
-GitHub: @shayesteh68
+### 3. Run the pipeline
+```bash
+Rscript scripts/01_qc_filter.R
+Rscript scripts/02_normalize_pca.R
+Rscript scripts/03_clustering_umap.R
+Rscript scripts/04_find_markers.R
+Rscript scripts/05_cell_annotation.R
+```
+
+---
+
+## Author
+**Narges Shayesteh**
+- LinkedIn: [linkedin.com/in/narges-shayesteh](https://linkedin.com/in/narges-shayesteh)
+- GitHub: [@shayesteh68](https://github.com/shayesteh68)
