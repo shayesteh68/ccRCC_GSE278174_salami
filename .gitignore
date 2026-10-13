@@ -2,6 +2,9 @@
 .RData
 .Rproj.user
 *.tar.gz
+*.gz
 *.zip
 *.swp
 *~
+data/raw_counts/
+data/metadata/*.rds

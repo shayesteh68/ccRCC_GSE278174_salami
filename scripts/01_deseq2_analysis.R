@@ -4,24 +4,67 @@ suppressPackageStartupMessages({
 })
 
 message("[1/5] Loading coldata metadata...")
-coldata <- read.delim("data/metadata/coldata.tsv", stringsAsFactors = FALSE)
+coldata <- read.delim(
+    "data/metadata/coldata.tsv",
+    stringsAsFactors = FALSE,
+    check.names = FALSE
+)
+
+required_metadata_columns <- c("sample_id", "condition")
+stopifnot(all(required_metadata_columns %in% colnames(coldata)))
+stopifnot(!anyDuplicated(coldata$sample_id))
+
 rownames(coldata) <- coldata$sample_id
-coldata$condition <- factor(coldata$condition, levels = c("Primary", "Metastatic"))
+coldata$condition <- factor(
+    coldata$condition,
+    levels = c("Primary", "Metastatic")
+)
+stopifnot(!anyNA(coldata$condition))
 
 message("[2/5] Loading raw counts matrix...")
-counts_raw <- read.delim("data/raw_counts/GSE278174_rawcounts.txt.gz", stringsAsFactors = FALSE)
+counts_raw <- read.delim(
+    "data/raw_counts/GSE278174_rawcounts.txt.gz",
+    stringsAsFactors = FALSE,
+    check.names = FALSE
+)
 
-# ترکیب Gene Symbol و Ensembl ID برای اطمینان از یکتایی و خوانایی شناسه ژن‌ها
-gene_ids <- paste0(counts_raw$Gene, " (", counts_raw$Ensembl_ID, ")")
-count_matrix <- as.matrix(counts_raw[, -(1:2)])
-rownames(count_matrix) <- gene_ids
+required_count_columns <- c("Ensembl_ID", "Gene")
+stopifnot(all(required_count_columns %in% colnames(counts_raw)))
 
-# همگام‌سازی و چینش دقیق ستون‌ها با سطر‌های متادیتا
-count_matrix <- count_matrix[, coldata$sample_id]
+sample_columns <- setdiff(colnames(counts_raw), required_count_columns)
+missing_in_counts <- setdiff(coldata$sample_id, sample_columns)
+extra_in_counts <- setdiff(sample_columns, coldata$sample_id)
+
+if (length(missing_in_counts) > 0) {
+    stop(
+        "Metadata samples missing from count matrix: ",
+        paste(missing_in_counts, collapse = ", ")
+    )
+}
+
+if (length(extra_in_counts) > 0) {
+    warning(
+        "Count-matrix samples absent from metadata will be excluded: ",
+        paste(extra_in_counts, collapse = ", ")
+    )
+}
+
+count_matrix <- as.matrix(counts_raw[, coldata$sample_id, drop = FALSE])
 storage.mode(count_matrix) <- "integer"
 
+gene_ids <- sub("\\..*$", "", counts_raw$Ensembl_ID)
+gene_ids[is.na(gene_ids) | gene_ids == ""] <- counts_raw$Gene[
+    is.na(gene_ids) | gene_ids == ""
+]
+rownames(count_matrix) <- make.unique(gene_ids)
+
 stopifnot(all(colnames(count_matrix) == rownames(coldata)))
-message(sprintf("Loaded count matrix: %d genes across %d samples.", nrow(count_matrix), ncol(count_matrix)))
+stopifnot(all(count_matrix >= 0))
+message(sprintf(
+    "Loaded count matrix: %d genes across %d samples.",
+    nrow(count_matrix),
+    ncol(count_matrix)
+))
 
 message("[3/5] Constructing DESeq2 dataset and filtering low counts...")
 dds <- DESeqDataSetFromMatrix(countData = count_matrix,
