@@ -1,0 +1,12 @@
+name: ccrcc-rnaseq
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - r-base=4.3
+  - bioconductor-deseq2
+  - bioconductor-geoquery
+  - bioconductor-clusterprofiler
+  - bioconductor-org.hs.eg.db
+  - bioconductor-enrichplot
+  - r-ggplot2

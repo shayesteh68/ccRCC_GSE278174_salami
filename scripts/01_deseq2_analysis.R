@@ -1,127 +1,174 @@
+#!/usr/bin/env Rscript
+
 suppressPackageStartupMessages({
-    library(DESeq2)
-    library(ggplot2)
+  library(DESeq2)
+  library(ggplot2)
 })
 
-message("[1/5] Loading coldata metadata...")
-coldata <- read.delim(
-    "data/metadata/coldata.tsv",
-    stringsAsFactors = FALSE,
-    check.names = FALSE
-)
+metadata_path <- "data/metadata/coldata.tsv"
+patient_map_path <- "data/metadata/patient_map.tsv"
+counts_path <- "data/raw_counts/GSE278174_rawcounts.txt.gz"
+out_dir <- "results/deseq2"
+plot_dir <- "results/plots"
 
-required_metadata_columns <- c("sample_id", "condition")
-stopifnot(all(required_metadata_columns %in% colnames(coldata)))
-stopifnot(!anyDuplicated(coldata$sample_id))
-
-rownames(coldata) <- coldata$sample_id
-coldata$condition <- factor(
-    coldata$condition,
-    levels = c("Primary", "Metastatic")
-)
-stopifnot(!anyNA(coldata$condition))
-
-message("[2/5] Loading raw counts matrix...")
-counts_raw <- read.delim(
-    "data/raw_counts/GSE278174_rawcounts.txt.gz",
-    stringsAsFactors = FALSE,
-    check.names = FALSE
-)
-
-required_count_columns <- c("Ensembl_ID", "Gene")
-stopifnot(all(required_count_columns %in% colnames(counts_raw)))
-
-sample_columns <- setdiff(colnames(counts_raw), required_count_columns)
-missing_in_counts <- setdiff(coldata$sample_id, sample_columns)
-extra_in_counts <- setdiff(sample_columns, coldata$sample_id)
-
-if (length(missing_in_counts) > 0) {
-    stop(
-        "Metadata samples missing from count matrix: ",
-        paste(missing_in_counts, collapse = ", ")
-    )
+for (path in c(metadata_path, patient_map_path, counts_path)) {
+  if (!file.exists(path)) stop("Required input is missing: ", path)
 }
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(plot_dir, recursive = TRUE, showWarnings = FALSE)
 
-if (length(extra_in_counts) > 0) {
-    warning(
-        "Count-matrix samples absent from metadata will be excluded: ",
-        paste(extra_in_counts, collapse = ", ")
-    )
+coldata <- read.delim(metadata_path, stringsAsFactors = FALSE, check.names = FALSE)
+patient_map <- read.delim(patient_map_path, stringsAsFactors = FALSE, check.names = FALSE)
+if (!all(c("sample_id", "condition") %in% names(coldata))) {
+  stop("coldata.tsv must contain sample_id and condition.")
 }
+if (!all(c("sample_id", "patient_id") %in% names(patient_map))) {
+  stop("patient_map.tsv must contain sample_id and patient_id.")
+}
+if (anyDuplicated(coldata$sample_id) || anyDuplicated(patient_map$sample_id)) {
+  stop("Sample IDs must be unique in both metadata files.")
+}
+if (anyNA(patient_map$patient_id) || any(!nzchar(trimws(patient_map$patient_id)))) {
+  stop("Fill in a study-confirmed patient_id for every sample in patient_map.tsv.")
+}
+if (!setequal(coldata$sample_id, patient_map$sample_id)) {
+  stop("patient_map.tsv must contain exactly the sample IDs in coldata.tsv.")
+}
+coldata$patient_id <- patient_map$patient_id[match(coldata$sample_id, patient_map$sample_id)]
+coldata$condition <- factor(coldata$condition, levels = c("Primary", "Metastatic"))
+if (anyNA(coldata$condition)) stop("condition values must be Primary or Metastatic.")
 
-count_matrix <- as.matrix(counts_raw[, coldata$sample_id, drop = FALSE])
-storage.mode(count_matrix) <- "integer"
-
-gene_ids <- sub("\\..*$", "", counts_raw$Ensembl_ID)
-gene_ids[is.na(gene_ids) | gene_ids == ""] <- counts_raw$Gene[
-    is.na(gene_ids) | gene_ids == ""
+pair_table <- table(coldata$patient_id, coldata$condition)
+paired_patients <- rownames(pair_table)[
+  pair_table[, "Primary"] > 0 & pair_table[, "Metastatic"] > 0
 ]
+if (length(paired_patients) < 2L) {
+  stop("At least two patients with both conditions are required for paired DE.")
+}
+coldata <- coldata[coldata$patient_id %in% paired_patients, , drop = FALSE]
+coldata$patient_id <- droplevels(factor(coldata$patient_id))
+rownames(coldata) <- coldata$sample_id
+
+counts_raw <- read.delim(counts_path, stringsAsFactors = FALSE, check.names = FALSE)
+if (!all(c("Ensembl_ID", "Gene") %in% names(counts_raw))) {
+  stop("Count matrix must contain Ensembl_ID and Gene columns.")
+}
+missing_samples <- setdiff(coldata$sample_id, names(counts_raw))
+if (length(missing_samples)) {
+  stop("Samples missing from counts: ", paste(missing_samples, collapse = ", "))
+}
+count_matrix <- as.matrix(counts_raw[, coldata$sample_id, drop = FALSE])
+storage.mode(count_matrix) <- "numeric"
+if (anyNA(count_matrix) || any(!is.finite(count_matrix)) ||
+    any(count_matrix < 0) || any(count_matrix != floor(count_matrix))) {
+  stop("Raw count columns must contain finite, non-negative integers.")
+}
+storage.mode(count_matrix) <- "integer"
+gene_ids <- sub("\\..*$", "", counts_raw$Ensembl_ID)
+fallback <- is.na(gene_ids) | !nzchar(gene_ids)
+gene_ids[fallback] <- counts_raw$Gene[fallback]
 rownames(count_matrix) <- make.unique(gene_ids)
+if (!identical(colnames(count_matrix), rownames(coldata))) {
+  stop("Count columns and metadata rows are not in the same order.")
+}
 
-stopifnot(all(colnames(count_matrix) == rownames(coldata)))
-stopifnot(all(count_matrix >= 0))
-message(sprintf(
-    "Loaded count matrix: %d genes across %d samples.",
-    nrow(count_matrix),
-    ncol(count_matrix)
-))
+input_tumor_samples <- nrow(coldata)
+sample_key <- paste(coldata$patient_id, coldata$condition, sep = "__")
+sample_levels <- unique(sample_key)
+aggregated_counts <- vapply(
+  sample_levels,
+  function(key) rowSums(count_matrix[, sample_key == key, drop = FALSE]),
+  numeric(nrow(count_matrix))
+)
+colnames(aggregated_counts) <- sample_levels
+if (anyNA(aggregated_counts) || any(!is.finite(aggregated_counts)) ||
+    any(aggregated_counts < 0) || any(aggregated_counts > .Machine$integer.max) ||
+    any(aggregated_counts != floor(aggregated_counts))) {
+  stop("Patient-condition aggregate counts must be non-negative integers within R's integer range.")
+}
+storage.mode(aggregated_counts) <- "integer"
 
-message("[3/5] Constructing DESeq2 dataset and filtering low counts...")
-dds <- DESeqDataSetFromMatrix(countData = count_matrix,
-                              colData = coldata,
-                              design = ~ condition)
+first_sample <- match(sample_levels, sample_key)
+coldata <- data.frame(
+  sample_id = sample_levels,
+  patient_id = as.character(coldata$patient_id[first_sample]),
+  condition = as.character(coldata$condition[first_sample]),
+  n_input_tumor_samples = vapply(sample_levels, function(key) sum(sample_key == key), integer(1)),
+  stringsAsFactors = FALSE
+)
+rownames(coldata) <- coldata$sample_id
+coldata$patient_id <- factor(coldata$patient_id)
+coldata$condition <- relevel(factor(coldata$condition, levels = c("Primary", "Metastatic")), ref = "Primary")
+if (!identical(colnames(aggregated_counts), rownames(coldata))) {
+  stop("Aggregated count columns and patient-condition metadata are out of order.")
+}
+design_matrix <- model.matrix(~ patient_id + condition, data = coldata)
+if (qr(design_matrix)$rank < ncol(design_matrix)) {
+  stop("Paired patient-condition design is not full rank; inspect patient_map.tsv and conditions.")
+}
 
+dds <- DESeqDataSetFromMatrix(
+  countData = aggregated_counts,
+  colData = coldata,
+  design = ~ patient_id + condition
+)
 keep <- rowSums(counts(dds) >= 10) >= 3
 dds <- dds[keep, ]
-message(sprintf("Retained %d genes after filtering low counts.", nrow(dds)))
-
-message("[4/5] Running DESeq2 differential expression...")
+if (nrow(dds) < 2L) stop("Too few genes remain after low-count filtering.")
 dds <- DESeq(dds)
 res <- results(dds, contrast = c("condition", "Metastatic", "Primary"))
 res_df <- as.data.frame(res)
 res_df$gene <- rownames(res_df)
-res_df <- res_df[order(res_df$pvalue), ]
+res_df <- res_df[order(res_df$padj, na.last = TRUE), , drop = FALSE]
+write.csv(
+  res_df,
+  file.path(out_dir, "differential_expression_Metastatic_vs_Primary.csv"),
+  row.names = FALSE
+)
 
-write.csv(res_df, "results/deseq2/differential_expression_Metastatic_vs_Primary.csv", row.names = FALSE)
-message("DEG results saved to results/deseq2/differential_expression_Metastatic_vs_Primary.csv")
-
-# خلاصه آماری ژن‌های معنادار
 sig_up <- sum(res$padj < 0.05 & res$log2FoldChange > 1, na.rm = TRUE)
 sig_down <- sum(res$padj < 0.05 & res$log2FoldChange < -1, na.rm = TRUE)
-message(sprintf("Significance (padj < 0.05 & |log2FC| > 1): Up-regulated in Metastatic = %d | Down-regulated = %d", sig_up, sig_down))
+writeLines(c(
+  "Paired DESeq2 analysis",
+  paste("Patients with both conditions:", length(paired_patients)),
+  paste("Original tumor samples retained:", input_tumor_samples),
+  paste("Patient-condition aggregates:", nrow(coldata)),
+  "Multiple metastatic lesions from one patient are summed within that patient-condition.",
+  paste("Genes retained:", nrow(dds)),
+  paste("Significant genes (padj < 0.05 and |log2FC| > 1):", sig_up + sig_down),
+  paste("Up in metastatic:", sig_up),
+  paste("Down in metastatic:", sig_down),
+  "Design: ~ patient_id + condition",
+  "Contrast: Metastatic versus Primary"
+), file.path(out_dir, "summary.txt"))
 
-message("[5/5] Generating QC & Visualization plots (PCA & Volcano)...")
 vsd <- vst(dds, blind = FALSE)
-pca_data <- plotPCA(vsd, intgroup = c("condition", "tissue"), returnData = TRUE)
-percentVar <- round(100 * attr(pca_data, "percentVar"))
+pca_data <- plotPCA(vsd, intgroup = c("condition", "patient_id"), returnData = TRUE)
+percent_var <- round(100 * attr(pca_data, "percentVar"))
+pca <- ggplot(pca_data, aes(PC1, PC2, color = condition, shape = patient_id)) +
+  geom_point(size = 3, alpha = 0.85) +
+  labs(
+    title = "Paired ccRCC samples: primary and metastatic",
+    x = paste0("PC1: ", percent_var[1], "% variance"),
+    y = paste0("PC2: ", percent_var[2], "% variance")
+  ) +
+  theme_bw()
+ggsave(file.path(plot_dir, "pca_paired_primary_vs_metastatic.png"), pca, width = 8, height = 6, dpi = 300)
 
-pca_plot <- ggplot(pca_data, aes(x = PC1, y = PC2, color = condition, shape = condition)) +
-    geom_point(size = 3.5, alpha = 0.85) +
-    scale_color_manual(values = c("Primary" = "#1f77b4", "Metastatic" = "#d62728")) +
-    xlab(paste0("PC1: ", percentVar[1], "% variance")) +
-    ylab(paste0("PC2: ", percentVar[2], "% variance")) +
-    ggtitle("PCA: GSE278174 Clear Cell RCC (Primary vs Metastatic)") +
-    theme_bw(base_size = 13) +
-    theme(legend.position = "right", plot.title = element_text(face = "bold", hjust = 0.5))
+volcano_data <- res_df[!is.na(res_df$padj), , drop = FALSE]
+volcano_data$group <- "Not significant"
+volcano_data$group[volcano_data$padj < 0.05 & volcano_data$log2FoldChange > 1] <- "Up in metastatic"
+volcano_data$group[volcano_data$padj < 0.05 & volcano_data$log2FoldChange < -1] <- "Down in metastatic"
+volcano <- ggplot(volcano_data, aes(log2FoldChange, -log10(pmax(padj, .Machine$double.xmin)), color = group)) +
+  geom_point(alpha = 0.55, size = 1.3) +
+  geom_vline(xintercept = c(-1, 1), linetype = "dashed") +
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed") +
+  labs(
+    title = "Paired differential expression: metastatic versus primary",
+    x = "log2 fold change",
+    y = "-log10 adjusted p-value"
+  ) +
+  theme_bw()
+ggsave(file.path(plot_dir, "volcano_paired_primary_vs_metastatic.png"), volcano, width = 8, height = 6, dpi = 300)
 
-ggsave("results/plots/pca_plot_primary_vs_metastatic.png", plot = pca_plot, width = 7.5, height = 5.5, dpi = 300)
-
-# Volcano Plot
-res_df$Significance <- "Not Significant"
-res_df$Significance[res_df$padj < 0.05 & res_df$log2FoldChange > 1] <- "Up in Metastatic"
-res_df$Significance[res_df$padj < 0.05 & res_df$log2FoldChange < -1] <- "Down in Metastatic"
-res_df$Significance <- factor(res_df$Significance, levels = c("Not Significant", "Down in Metastatic", "Up in Metastatic"))
-
-volcano_plot <- ggplot(res_df[!is.na(res_df$padj), ], aes(x = log2FoldChange, y = -log10(padj), color = Significance)) +
-    geom_point(alpha = 0.5, size = 1.6) +
-    scale_color_manual(values = c("Not Significant" = "grey75", "Down in Metastatic" = "#1f77b4", "Up in Metastatic" = "#d62728")) +
-    geom_vline(xintercept = c(-1, 1), linetype = "dashed", color = "black", alpha = 0.5) +
-    geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black", alpha = 0.5) +
-    labs(title = "Volcano: Metastatic vs Primary Clear Cell RCC",
-         x = expression(log[2] ~ "Fold Change"),
-         y = expression(-log[10] ~ "Adjusted P-value")) +
-    theme_bw(base_size = 13) +
-    theme(legend.position = "top", plot.title = element_text(face = "bold", hjust = 0.5))
-
-ggsave("results/plots/volcano_plot.png", plot = volcano_plot, width = 7, height = 5.5, dpi = 300)
-message("Plots successfully saved in results/plots/ directory.")
+message("Paired DE completed for ", length(paired_patients), " patients from ", input_tumor_samples, " tumor samples.")

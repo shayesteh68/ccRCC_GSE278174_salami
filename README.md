@@ -1,48 +1,29 @@
-# ccRCC GSE278174: Metastatic vs Primary Transcriptomic Analysis
+# ccRCC primary versus metastatic RNA-seq (GSE278174)
 
-A reproducible bulk RNA-seq differential expression and functional pathway enrichment workflow analyzing clear cell Renal Cell Carcinoma (ccRCC) patient cohorts from NCBI GEO dataset **GSE278174**.
+This repository contains a bulk RNA-seq analysis workflow for the 42 samples in GEO series GSE278174: 19 primary tumors and 23 metastatic samples from 19 patients. The design is paired by patient, and several patients contributed more than one metastasis.
 
----
+## Inputs
 
-## Overview
+- `data/metadata/coldata.tsv` — sample IDs, GEO accessions, tissue sites, and conditions.
+- `data/metadata/patient_map.tsv` — sample-to-patient mapping from the study's Supplementary Information 3.
+- `data/metadata/PATIENT_MAP_PROVENANCE.md` — source fields and validation summary for the mapping.
+- `data/raw_counts/GSE278174_rawcounts.txt.gz` — GEO raw counts; retrieve with `Rscript scripts/00_download_rawcounts.R`.
 
-- **Dataset:** NCBI GEO [GSE278174](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE278174)
-- **Organism:** *Homo sapiens*
-- **Design:** Metastatic clear cell Renal Cell Carcinoma (ccRCC) vs Primary ccRCC
-- **Cohort Size:** 42 samples (19 Primary, 23 Metastatic)
+The verified map links every sample to its de-identified patient code using the study's `Library.ID` and `Myriad` fields. The analysis checks that sample IDs match exactly and that the paired design is usable before running differential expression.
 
----
+## Run
 
-## Key Biological Findings
+Create the Conda environment, then run from the repository root:
 
-### 1. Differential Expression Analysis (DESeq2)
-- **Total Genes Evaluated:** 14,971
-- **Significantly Regulated Genes:** 3,460 genes (1,713 Up, 1,747 Down)
-
-### 2. Functional Pathway Enrichment (GO Biological Process)
-Top findings include:
-- **Nuclear division** (GO:0000280)
-- **Organelle fission** (GO:0048285)
-- **Mitotic nuclear division** (GO:0140014)
-
----
-
-## Repository Structure
-
-
-```text
-.
-├── data/raw_counts/GSE278174_rawcounts.txt.gz
-├── scripts/01_deseq2_analysis.R
-├── scripts/02_pathway_enrichment.R
-└── results/
-
+```bash
+conda env create -f environment.yml
+conda activate ccrcc-rnaseq
+Rscript scripts/00_fetch_geo_metadata.R
+Rscript scripts/00_download_rawcounts.R
+Rscript scripts/01_deseq2_analysis.R
+Rscript scripts/02_pathway_enrichment.R
 ```
 
----
+The DE model is `~ patient_id + condition`, with metastatic versus primary as the contrast. This implementation is a paired DESeq2 workflow; it is not an exact reproduction of the study's published edgeR/limma analysis. Existing outputs, if present, should be regenerated before citation.
 
-## Pipeline Execution
-
-1. `conda activate r-ccrcc`
-2. `Rscript scripts/01_deseq2_analysis.R`
-3. `Rscript scripts/02_pathway_enrichment.R`
+Code in this repository is licensed under the MIT License (see `LICENSE`). Third-party data, software, and study supplements remain subject to their own terms.
