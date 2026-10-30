@@ -145,8 +145,10 @@ writeLines(c(
 vsd <- vst(dds, blind = FALSE)
 pca_data <- plotPCA(vsd, intgroup = c("condition", "patient_id"), returnData = TRUE)
 percent_var <- round(100 * attr(pca_data, "percentVar"))
-pca <- ggplot(pca_data, aes(PC1, PC2, color = condition, shape = patient_id)) +
-  geom_point(size = 3, alpha = 0.85) +
+pca <- ggplot(pca_data, aes(PC1, PC2, color = condition, group = patient_id)) +
+  geom_line(color = "grey70", alpha = 0.65, linewidth = 0.45) +
+  geom_point(aes(shape = condition), size = 3, alpha = 0.9) +
+  scale_shape_manual(values = c("Primary" = 16, "Metastatic" = 17)) +
   labs(
     title = "Paired ccRCC samples: primary and metastatic",
     x = paste0("PC1: ", percent_var[1], "% variance"),

@@ -24,6 +24,13 @@ Rscript scripts/01_deseq2_analysis.R
 Rscript scripts/02_pathway_enrichment.R
 ```
 
-The DE model is `~ patient_id + condition`, with metastatic versus primary as the contrast. This implementation is a paired DESeq2 workflow; it is not an exact reproduction of the study's published edgeR/limma analysis. Existing outputs, if present, should be regenerated before citation.
+For an exact Linux x86_64 environment, use the lock file generated from the audited dependency set:
+
+```bash
+conda create -n ccrcc-rnaseq --file environment-linux-64.lock.txt
+conda activate ccrcc-rnaseq
+```
+
+The DE model is `~ patient_id + condition`, with metastatic versus primary as the contrast. The checked-in results are regenerated from this workflow and summarize 19 paired patients as 38 patient-condition aggregates; multiple metastatic lesions from one patient are summed within that condition. This is a paired DESeq2 workflow, not an exact reproduction of the study's published edgeR/limma analysis.
 
 Code in this repository is licensed under the MIT License (see `LICENSE`). Third-party data, software, and study supplements remain subject to their own terms.

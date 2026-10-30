@@ -1,0 +1,11 @@
+Paired DESeq2 analysis
+Patients with both conditions: 19
+Original tumor samples retained: 42
+Patient-condition aggregates: 38
+Multiple metastatic lesions from one patient are summed within that patient-condition.
+Genes retained: 14971
+Significant genes (padj < 0.05 and |log2FC| > 1): 3860
+Up in metastatic: 1989
+Down in metastatic: 1871
+Design: ~ patient_id + condition
+Contrast: Metastatic versus Primary

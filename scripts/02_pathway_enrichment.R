@@ -52,11 +52,15 @@ for (direction in names(gene_sets)) {
     write.csv(as.data.frame(go), file.path("results/pathway", paste0("go_bp_", direction, ".csv")), row.names = FALSE)
     ggsave(file.path("results/plots", paste0("go_bp_", direction, ".png")),
       dotplot(go, showCategory = 15, title = paste("GO BP:", direction)), width = 8, height = 6, dpi = 300)
+  } else {
+    message("GO BP ", direction, ": no terms passed the configured significance cutoffs.")
   }
 
+  kegg_failed <- FALSE
   kegg <- tryCatch(
     enrichKEGG(gene = genes, universe = universe, organism = "hsa", pAdjustMethod = "BH", pvalueCutoff = 0.05, qvalueCutoff = 0.2),
     error = function(e) {
+      kegg_failed <<- TRUE
       message("KEGG ", direction, " failed: ", conditionMessage(e))
       NULL
     }
@@ -66,6 +70,8 @@ for (direction in names(gene_sets)) {
     write.csv(as.data.frame(kegg), file.path("results/pathway", paste0("kegg_", direction, ".csv")), row.names = FALSE)
     ggsave(file.path("results/plots", paste0("kegg_", direction, ".png")),
       dotplot(kegg, showCategory = 15, title = paste("KEGG:", direction)), width = 8, height = 6, dpi = 300)
+  } else if (!kegg_failed) {
+    message("KEGG ", direction, ": no terms passed the configured significance cutoffs.")
   }
 }
 
