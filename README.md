@@ -2,6 +2,10 @@
 
 This repository contains a bulk RNA-seq analysis workflow for the 42 samples in GEO series GSE278174: 19 primary tumors and 23 metastatic samples from 19 patients. The design is paired by patient, and several patients contributed more than one metastasis.
 
+## Data source and relationship to the study
+
+This is an independent reanalysis of public data from Cotta et al., “Molecular profiling of primary versus paired asynchronous metastatic clear cell renal cell carcinoma reveals heterogeneity in tumor immune microenvironment,” *Scientific Reports* (2026), [doi:10.1038/s41598-026-35021-7](https://doi.org/10.1038/s41598-026-35021-7). It was not commissioned by, or conducted in collaboration with, the authors or their institutions. The workflow uses DESeq2 and is not an exact reproduction of the paper’s published edgeR/limma analysis.
+
 ## Inputs
 
 - `data/metadata/coldata.tsv` — sample IDs, GEO accessions, tissue sites, and conditions.
